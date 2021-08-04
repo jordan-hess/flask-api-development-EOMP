@@ -19,8 +19,9 @@ class User(object):
 def index():
     return render_template("register.html")
 
+
 def fetch_user():
-    with sqlite3.connect('register.db') as conn:
+    with sqlite3.connect('product.db') as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM user")
         users = cursor.fetchall()
@@ -33,7 +34,7 @@ def fetch_user():
 
 
 def register_table():
-    connect = sqlite3.connect('register.db')
+    connect = sqlite3.connect('product.db')
 
     connect.execute('CREATE TABLE IF NOT EXISTS user (userid INTEGER PRIMARY KEY AUTOINCREMENT,'
                     'name TEXT NOT NULL,'
@@ -45,6 +46,7 @@ def register_table():
 
 
 register_table()
+
 
 def product_table():
     connect = sqlite3.connect('product.db')
@@ -66,7 +68,6 @@ username_table = {u.username: u for u in users}
 userid_table = {u.id: u for u in users}
 
 
-
 def authenticate(username, password):
     user = username_table.get(username, None)
     if user and hmac.compare_digest(user.password.encode('utf-8'), password.encode('utf-8')):
@@ -76,6 +77,7 @@ def authenticate(username, password):
 def identity(payload):
     user_id = payload['identity']
     return userid_table.get(user_id, None)
+
 
 app.config['SECRET_KEY'] = 'super-secret'
 jwt = JWT(app, authenticate, identity)
@@ -90,7 +92,7 @@ def add_users():
         email = request.form['email']
 
         # if password == password:
-        with sqlite3.connect('register.db') as con:
+        with sqlite3.connect('product.db') as con:
             cursor = con.cursor()
             cursor.execute("INSERT INTO user (name, username, password, email) VALUES (?, ?, ?, ?)", (names, username, password, email))
             con.commit()
@@ -109,7 +111,7 @@ def login_user():
         username = request.form['username']
         password = request.form['password']
 
-        with sqlite3.connect('register.db') as con:
+        with sqlite3.connect('product.db') as con:
             cursor = con.cursor()
             cursor.execute("SELECT * FROM user where username={} and password={}".format(username, password))
             con.commit()
@@ -152,6 +154,7 @@ def dict_factory(cursor, row):
         d[x[0]] = row[i]
     return d
 
+
 @app.route('/select-product/', methods=['GET'])
 def select_product():
     products = []
@@ -171,26 +174,26 @@ def select_product():
 
 @app.route('/delete-products/<int:product_id>/')
 def delete_product(product_id):
-    msg = None
+    response = {}
     try:
         with sqlite3.connect('product.db') as con:
             cur = con.cursor()
-            cur.execute("DELETE FROM items WHERE product_id=?" + str(product_id))
+            cur.execute("DELETE FROM items WHERE product_id=" + str(product_id))
             con.commit()
-            msg = "A record was deleted successfully from the database."
+            response["msg"] = "A record was deleted successfully from the database."
     except Exception as e:
         con.rollback()
-        msg = "Error occurred when deleting a product in the database: " + str(e)
+        response["msg"] = "Error occurred when deleting a product in the database: " + str(e)
     finally:
         con.close()
-        return jsonify(msg=msg)
+        return jsonify(response)
 
 
 @app.route('/update/<int:product_id>/', methods=["PUT"])
 def updating_products(product_id):
     response = {}
     if request.method == "PUT":
-            with sqlite3.connect('product.db.db') as con:
+            with sqlite3.connect('product.db') as con:
                 print(request.json)
                 incoming_data = dict(request.json)
                 put_data = {}
@@ -202,9 +205,9 @@ def updating_products(product_id):
                     cursor.execute("UPDATE items SET category =? WHERE product_id=?", (put_data["category"], product_id))
             elif incoming_data.get("name") is not None:
                 put_data["name"] = incoming_data.get("name")
-                with sqlite3.connect('product.db.db') as connection:
+                with sqlite3.connect('product.db') as connection:
                     cursor = connection.cursor()
-                    cursor.execute("UPDATE items SET name =? WHERE product_id=?",(put_data["name"], product_id))
+                    cursor.execute("UPDATE items SET name =? WHERE product_id=?", (put_data["name"], product_id))
                     con.commit()
                     response['message'] = "Update was successful"
                     response['status_code'] = 200
