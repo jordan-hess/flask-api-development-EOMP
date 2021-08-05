@@ -135,26 +135,24 @@ mail = Mail(app)
 
 @app.route('/adding-users/', methods=['POST'])
 def add_users():
-    response = {}
-    names = request.form['name']
-    username = request.form['username']
-    password = request.form['password']
-    email = request.form['email']
+    try:
+        names = request.form['name']
+        username = request.form['username']
+        password = request.form['password']
+        email = request.form['email']
 
-    # if password == password:
-    with sqlite3.connect('product.db') as con:
-        cursor = con.cursor()
-        cursor.execute("INSERT INTO user (name, username, password, email) VALUES (?, ?, ?, ?)", (names, username, password, email))
-        con.commit()
+        # if password == password:
+        with sqlite3.connect('product.db') as con:
+            cursor = con.cursor()
+            cursor.execute("INSERT INTO user (name, username, password, email) VALUES (?, ?, ?, ?)", (names, username, password, email))
+            con.commit()
+            msg = username + "was added to the database"
+    except Exception as e:
+        con.rollback()
+        msg = "Error occured in insert" + str(e)
+    finally:
         con.close()
-
-        response['message'] = 'Success'
-        response['status_code'] = 201
-        if response["status_code"] == 201:
-            msg = Message("Hello Message", sender="lifechoicesemail@gmail.com", recipients=[email])
-            msg.body = "My email using Flask"
-            mail.send(msg)
-            return "Message sent"
+    return jsonify(msg=msg)
 
 
 @app.route('/login/', methods=['POST'])
@@ -310,7 +308,18 @@ def updating_products(product_id):
         conn.close()
         return jsonify(response)
 
-            
+
+@app.route('/sendemail/<email>', methods=['GET'])
+def email_sending(email):
+    mail = Mail(app)
+
+    msg = Message('Hello Message', sender='lifechoicesemail@gmail.com', recipients=[email])
+    msg.body = "This is my emails body"
+    mail.send(msg)
+
+    return "sent"
+
+
 if __name__ == "__main__":
     app.debug = True
     app.run(port=5001)
