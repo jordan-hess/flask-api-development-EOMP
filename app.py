@@ -3,6 +3,8 @@ import hmac
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from flask_jwt import JWT, jwt_required
+import smtplib
+from flask_mail import Mail, Message
 
 app = Flask(__name__)
 CORS(app)
@@ -13,6 +15,46 @@ class User(object):
         self.id = id
         self.username = username
         self.password = password
+
+
+class Products(object):
+    def __init__(self, product_id, name, price, category, description, product_image):
+        self.product_id = product_id
+        self.product_name = name
+        self.product_price = price
+        self.product_category = category
+        self.product_description = description
+        self.product_image = product_image
+
+
+class MyDatabase(object):
+    def __init__(self):
+        self.conn = sqlite3.connect('product.db')
+        self.cursor = self.conn.cursor()
+
+    def adding_product(self, value):
+        query = "INSERT INTO items (product_id, name, price, category, description," \
+                "product_image) VALUES (?, ?, ?, ?, ?)"
+        self.cursor.execute(query, value)
+
+    def deleting_product(self, value):
+        query = "DELETE FROM items WHERE product_id='" + value + "'"
+        self.cursor.execute(query, value)
+
+    def updating_product(self, value):
+        query = "UPDATE items SET product_id=?, name=?, price=?, category=?, description=?," \
+                "product_image=?"
+        self.cursor.execute(query, value)
+
+    def see_product(self):
+        self.cursor.execute("SELECT * FROM items")
+        return self.cursor.fetchall()
+
+    def commit(self):
+        self.conn.commit()
+
+
+db = MyDatabase()
 
 
 @app.route("/")
@@ -41,7 +83,7 @@ def register_table():
                     'username TEXT NOT NULL,'
                     'password TEXT NOT NULL, '
                     'email TEXT NOT NULL)')
-    print("Table was created successfully")
+    print("User table was created successfully")
     connect.close()
 
 
@@ -51,10 +93,11 @@ register_table()
 def product_table():
     connect = sqlite3.connect('product.db')
 
-    connect.execute('CREATE TABLE IF NOT EXISTS items (product_id INTEGER PRIMARY KEY AUTOINCREMENT,'
+    connect.execute('CREATE TABLE IF NOT EXISTS items(product_id INTEGER PRIMARY KEY AUTOINCREMENT,'
                     'name TEXT NOT NULL,'
                     'price TEXT NOT NULL,'
                     'category TEXT NOT NULL, '
+                    'product_image TEXT NOT NULL,'
                     'description TEXT NOT NULL)')
     print("Product table was created successfully")
     connect.close()
@@ -81,28 +124,37 @@ def identity(payload):
 
 app.config['SECRET_KEY'] = 'super-secret'
 jwt = JWT(app, authenticate, identity)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = 'lifechoicesemail@gmail.com'
+app.config['MAIL_PASSWORD'] = 'lifechoices'
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
 
 
 @app.route('/adding-users/', methods=['POST'])
 def add_users():
-    try:
-        names = request.form['name']
-        username = request.form['username']
-        password = request.form['password']
-        email = request.form['email']
+    response = {}
+    names = request.form['name']
+    username = request.form['username']
+    password = request.form['password']
+    email = request.form['email']
 
-        # if password == password:
-        with sqlite3.connect('product.db') as con:
-            cursor = con.cursor()
-            cursor.execute("INSERT INTO user (name, username, password, email) VALUES (?, ?, ?, ?)", (names, username, password, email))
-            con.commit()
-            msg = username + " was added as a registered user"
-    except Exception as e:
-            con.rollback()
-            msg = "Error occurred in insert" + str(e)
-    finally:
+    # if password == password:
+    with sqlite3.connect('product.db') as con:
+        cursor = con.cursor()
+        cursor.execute("INSERT INTO user (name, username, password, email) VALUES (?, ?, ?, ?)", (names, username, password, email))
+        con.commit()
         con.close()
-    return jsonify(msg=msg)
+
+        response['message'] = 'Success'
+        response['status_code'] = 201
+        if response["status_code"] == 201:
+            msg = Message("Hello Message", sender="lifechoicesemail@gmail.com", recipients=[email])
+            msg.body = "My email using Flask"
+            mail.send(msg)
+            return "Message sent"
 
 
 @app.route('/login/', methods=['POST'])
@@ -122,6 +174,19 @@ def login_user():
     finally:
         con.close()
     return jsonify(msg=msg)
+
+
+@app.route('/view_pro/<name>/', methods=["GET"])
+def view_profile(name):
+    response = {}
+    if request.method == "GET":
+        with sqlite3.connect("product.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user WHERE name='" + name + "'")
+            data = cursor.fetchall()
+            response['message'] = "welcome back " + str(name)
+            response['data'] = data
+        return response
 
 
 # create products
@@ -192,26 +257,58 @@ def delete_product(product_id):
 @app.route('/update/<int:product_id>/', methods=["PUT"])
 def updating_products(product_id):
     response = {}
-    if request.method == "PUT":
-            with sqlite3.connect('product.db') as con:
+    try:
+        if request.method == "PUT":
+            with sqlite3.connect('product.db') as conn:
                 print(request.json)
                 incoming_data = dict(request.json)
                 put_data = {}
-            if incoming_data.get("category") is not None:
-                put_data["category"] = incoming_data.get("category")
 
-                with sqlite3.connect('product.db') as connection:
-                    cursor = connection.cursor()
-                    cursor.execute("UPDATE items SET category =? WHERE product_id=?", (put_data["category"], product_id))
-            elif incoming_data.get("name") is not None:
-                put_data["name"] = incoming_data.get("name")
-                with sqlite3.connect('product.db') as connection:
-                    cursor = connection.cursor()
-                    cursor.execute("UPDATE items SET name =? WHERE product_id=?", (put_data["name"], product_id))
-                    con.commit()
-                    response['message'] = "Update was successful"
-                    response['status_code'] = 200
-                    return response
+                if incoming_data.get("name") is not None:
+                    put_data["name"] = incoming_data.get("name")
+
+                    with sqlite3.connect('product.db') as connection:
+                        cursor = connection.cursor()
+                        cursor.execute("UPDATE items SET name =? WHERE product_id=?",
+                                       (put_data["name"], product_id))
+                        conn.commit()
+                        response['message'] = "Update was successfully updated"
+
+                elif incoming_data.get("price") is not None:
+                    put_data["price"] = incoming_data.get("price")
+
+                    with sqlite3.connect('product.db') as connection:
+                        cursor = connection.cursor()
+                        cursor.execute("UPDATE items SET price =? WHERE product_id=?",
+                                       (put_data["price"], product_id))
+                        conn.commit()
+                        response['message'] = "Update was successfully"
+
+                elif incoming_data.get("category") is not None:
+                    put_data["category"] = incoming_data.get("category")
+
+                    with sqlite3.connect('product.db') as connection:
+                        cursor = connection.cursor()
+                        cursor.execute("UPDATE items SET category =? WHERE product_id=?",
+                                       (put_data["category"], product_id))
+                        conn.commit()
+                        response['message'] = "Update was successfully"
+
+                elif incoming_data.get("description") is not None:
+                    put_data["description"] = incoming_data.get("description")
+
+                    with sqlite3.connect('product.db') as connection:
+                        cursor = connection.cursor()
+                        cursor.execute("UPDATE items SET description =? WHERE product_id=?",
+                                       (put_data["description"], product_id))
+                        conn.commit()
+                        response['message'] = "Update was successfully"
+    except Exception as e:
+        conn.rollback()
+        response["msg"] = "Error occurred when updating a product in the database: " + str(e)
+    finally:
+        conn.close()
+        return jsonify(response)
 
             
 if __name__ == "__main__":
