@@ -5,18 +5,49 @@ from flask_cors import CORS
 from flask_jwt import JWT, jwt_required
 import smtplib
 from flask_mail import Mail, Message
+import datetime
 
 app = Flask(__name__)
 CORS(app)
 
+# fetching the data from my database
+def fetch_user():
+    with sqlite3.connect('product.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM user")
+        users = cursor.fetchall()
 
+        new_data = []
+
+        for data in users:
+            new_data.append(User(data[0], data[2], data[3]))
+    return new_data
+
+
+# DOM manipulation for users
 class User(object):
     def __init__(self, id, username, password):
         self.id = id
         self.username = username
         self.password = password
 
+# User athentication
+users = fetch_user()
+username_table = {u.username: u for u in users}
+userid_table = {u.id: u for u in users}
 
+
+def authenticate(username, password):
+    user = username_table.get(username, None)
+    if user and hmac.compare_digest(user.password.encode('utf-8'), password.encode('utf-8')):
+        return user
+
+
+def identity(payload):
+    user_id = payload['identity']
+    return userid_table.get(user_id, None)
+
+# DOM manipulation for products
 class Products(object):
     def __init__(self, product_id, name, price, category, description, product_image):
         self.product_id = product_id
@@ -26,7 +57,7 @@ class Products(object):
         self.product_description = description
         self.product_image = product_image
 
-
+# DOM manipulation for database
 class MyDatabase(object):
     def __init__(self):
         self.conn = sqlite3.connect('product.db')
@@ -57,24 +88,13 @@ class MyDatabase(object):
 db = MyDatabase()
 
 
+# made the registration page the index of the project
 @app.route("/")
 def index():
     return render_template("register.html")
 
 
-def fetch_user():
-    with sqlite3.connect('product.db') as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM user")
-        users = cursor.fetchall()
-
-        new_data = []
-
-        for data in users:
-            new_data.append(User(data[0], data[3], data[4]))
-    return new_data
-
-
+# creating my register table
 def register_table():
     connect = sqlite3.connect('product.db')
 
@@ -90,6 +110,7 @@ def register_table():
 register_table()
 
 
+# creating my products table
 def product_table():
     connect = sqlite3.connect('product.db')
 
@@ -105,34 +126,7 @@ def product_table():
 
 product_table()
 
-users = fetch_user()
-
-username_table = {u.username: u for u in users}
-userid_table = {u.id: u for u in users}
-
-
-def authenticate(username, password):
-    user = username_table.get(username, None)
-    if user and hmac.compare_digest(user.password.encode('utf-8'), password.encode('utf-8')):
-        return user
-
-
-def identity(payload):
-    user_id = payload['identity']
-    return userid_table.get(user_id, None)
-
-
-app.config['SECRET_KEY'] = 'super-secret'
-jwt = JWT(app, authenticate, identity)
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USERNAME'] = 'lifechoicesemail@gmail.com'
-app.config['MAIL_PASSWORD'] = 'lifechoices'
-app.config['MAIL_USE_TLS'] = False
-app.config['MAIL_USE_SSL'] = True
-mail = Mail(app)
-
-
+# registration page
 @app.route('/adding-users/', methods=['POST'])
 def add_users():
     try:
@@ -141,20 +135,20 @@ def add_users():
         password = request.form['password']
         email = request.form['email']
 
-        # if password == password:
         with sqlite3.connect('product.db') as con:
             cursor = con.cursor()
             cursor.execute("INSERT INTO user (name, username, password, email) VALUES (?, ?, ?, ?)", (names, username, password, email))
             con.commit()
-            msg = username + "was added to the database"
+            msg = username + " was added to the database"
     except Exception as e:
         con.rollback()
-        msg = "Error occured in insert" + str(e)
+        msg = "Error occurred in adding user to the database" + str(e)
     finally:
         con.close()
     return jsonify(msg=msg)
 
 
+# login page
 @app.route('/login/', methods=['POST'])
 def login_user():
     try:
@@ -174,6 +168,7 @@ def login_user():
     return jsonify(msg=msg)
 
 
+# this code allows the user to view their profile
 @app.route('/view_pro/<name>/', methods=["GET"])
 def view_profile(name):
     response = {}
@@ -187,8 +182,9 @@ def view_profile(name):
         return response
 
 
-# create products
+# creating products page
 @app.route('/create-product/', methods=["POST"])
+@jwt_required()
 def create_product():
     response = {}
 
@@ -217,7 +213,7 @@ def dict_factory(cursor, row):
         d[x[0]] = row[i]
     return d
 
-
+# this code allows you to view the products
 @app.route('/select-product/', methods=['GET'])
 def select_product():
     products = []
@@ -234,8 +230,9 @@ def select_product():
         connect.close()
         return jsonify(products)
 
-
+# this code allows you to delete products using its id
 @app.route('/delete-products/<int:product_id>/')
+@jwt_required()
 def delete_product(product_id):
     response = {}
     try:
@@ -252,7 +249,9 @@ def delete_product(product_id):
         return jsonify(response)
 
 
+# this code allows you to edit elements in the product
 @app.route('/update/<int:product_id>/', methods=["PUT"])
+@jwt_required()
 def updating_products(product_id):
     response = {}
     try:
@@ -262,6 +261,7 @@ def updating_products(product_id):
                 incoming_data = dict(request.json)
                 put_data = {}
 
+                # editing name of the product
                 if incoming_data.get("name") is not None:
                     put_data["name"] = incoming_data.get("name")
 
@@ -272,6 +272,7 @@ def updating_products(product_id):
                         conn.commit()
                         response['message'] = "Update was successfully updated"
 
+                # editing the price of the product
                 elif incoming_data.get("price") is not None:
                     put_data["price"] = incoming_data.get("price")
 
@@ -282,6 +283,7 @@ def updating_products(product_id):
                         conn.commit()
                         response['message'] = "Update was successfully"
 
+                # editing the products category
                 elif incoming_data.get("category") is not None:
                     put_data["category"] = incoming_data.get("category")
 
@@ -292,6 +294,7 @@ def updating_products(product_id):
                         conn.commit()
                         response['message'] = "Update was successfully"
 
+                # editing the description of the product
                 elif incoming_data.get("description") is not None:
                     put_data["description"] = incoming_data.get("description")
 
@@ -309,7 +312,24 @@ def updating_products(product_id):
         return jsonify(response)
 
 
-@app.route('/sendemail/<email>', methods=['GET'])
+# configuration of sending emails
+app.config['SECRET_KEY'] = 'super-secret'
+app.config['JWT_EXPIRATION_DELTA'] = datetime.timedelta(seconds=4000)
+CORS(app)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = "huntermoonspear@gmail.com"
+app.config['MAIL_PASSWORD'] = "dianadragonheart"
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
+
+jwt = JWT(app, authenticate, identity)
+
+
+# code allows you to send emails
+@app.route('/send_mail/<email>', methods=['GET'])
+@jwt_required()
 def email_sending(email):
     mail = Mail(app)
 
