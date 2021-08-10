@@ -3,7 +3,6 @@ import hmac
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from flask_jwt import JWT, jwt_required
-import smtplib
 from flask_mail import Mail, Message
 import datetime
 
@@ -157,7 +156,7 @@ def login_user():
 
         with sqlite3.connect('product.db') as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM user where username={} and password={}".format(username, password))
+            cursor.execute("SELECT * FROM user where username=? and password=?", (username, password))
             con.commit()
             msg = username + " is logged in!"
     except Exception as e:
