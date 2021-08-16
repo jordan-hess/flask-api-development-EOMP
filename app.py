@@ -182,7 +182,7 @@ def view_profile(name):
 
 # creating products page
 @app.route('/create-product/', methods=["POST"])
-@jwt_required()
+#@jwt_required()
 def create_product():
     response = {}
 
@@ -327,7 +327,7 @@ jwt = JWT(app, authenticate, identity)
 
 # code allows you to send emails
 @app.route('/send_mail/<email>', methods=['GET'])
-@jwt_required()
+#@jwt_required()
 def email_sending(email):
     mail = Mail(app)
 
