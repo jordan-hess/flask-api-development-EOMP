@@ -30,7 +30,7 @@ class User(object):
         self.username = username
         self.password = password
 
-# User athentication
+# User authentication
 users = fetch_user()
 username_table = {u.username: u for u in users}
 userid_table = {u.id: u for u in users}
@@ -48,13 +48,12 @@ def identity(payload):
 
 # DOM manipulation for products
 class Products(object):
-    def __init__(self, product_id, name, price, category, description, product_image):
+    def __init__(self, product_id, name, price, category, description):
         self.product_id = product_id
         self.product_name = name
         self.product_price = price
         self.product_category = category
         self.product_description = description
-        self.product_image = product_image
 
 # DOM manipulation for database
 class MyDatabase(object):
@@ -231,7 +230,7 @@ def select_product():
 
 # this code allows you to delete products using its id
 @app.route('/delete-products/<int:product_id>/')
-@jwt_required()
+# @jwt_required()
 def delete_product(product_id):
     response = {}
     try:
@@ -250,7 +249,7 @@ def delete_product(product_id):
 
 # this code allows you to edit elements in the product
 @app.route('/update/<int:product_id>/', methods=["PUT"])
-@jwt_required()
+# @jwt_required()
 def updating_products(product_id):
     response = {}
     try:
