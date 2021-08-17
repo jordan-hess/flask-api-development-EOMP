@@ -183,7 +183,7 @@ def view_profile(name):
 
 # creating products page
 @app.route('/create-product/', methods=["POST"])
-@jwt_required()
+# @jwt_required()
 def create_product():
     response = {}
 
@@ -231,7 +231,7 @@ def select_product():
 
 # this code allows you to delete products using its id
 @app.route('/delete-products/<int:product_id>/')
-@jwt_required()
+# @jwt_required()
 def delete_product(product_id):
     response = {}
     try:
@@ -250,7 +250,7 @@ def delete_product(product_id):
 
 # this code allows you to edit elements in the product
 @app.route('/update/<int:product_id>/', methods=["PUT"])
-@jwt_required()
+# @jwt_required()
 def updating_products(product_id):
     response = {}
     try:
