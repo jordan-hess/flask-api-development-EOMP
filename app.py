@@ -151,8 +151,8 @@ def add_users():
 @app.route('/login/', methods=['POST'])
 def login_user():
     try:
-        username = request.form['username']
-        password = request.form['password']
+        username = request.json['username']
+        password = request.json['password']
 
         with sqlite3.connect('product.db') as con:
             cursor = con.cursor()
